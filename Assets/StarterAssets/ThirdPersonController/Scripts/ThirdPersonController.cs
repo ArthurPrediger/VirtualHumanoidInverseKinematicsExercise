@@ -1,6 +1,7 @@
 ﻿ using UnityEngine;
 #if ENABLE_INPUT_SYSTEM 
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.XR;
 using UnityEngine.Rendering;
 #endif
 
@@ -417,10 +418,8 @@ namespace StarterAssets
             AdjustFeetTarget(ref rightFootPos, HumanBodyBones.RightFoot);
             AdjustFeetTarget(ref leftFootPos, HumanBodyBones.LeftFoot);
 
-            FeetPosSolver(rightFootPos, ref rightFootIKPos, ref rightFootIKRot);
-            FeetPosSolver(leftFootPos, ref leftFootIKPos, ref leftFootIKRot);
-
-
+            FeetPosSolver(rightFootPos, ref rightFootIKPos, ref rightFootIKRot, _animator.GetBoneTransform(HumanBodyBones.RightFoot).transform);
+            FeetPosSolver(leftFootPos, ref leftFootIKPos, ref leftFootIKRot, _animator.GetBoneTransform(HumanBodyBones.LeftFoot).transform);
         }
 
         private void OnAnimatorIK(int layerIndex)
@@ -432,24 +431,14 @@ namespace StarterAssets
 
             _animator.SetIKPositionWeight(AvatarIKGoal.RightFoot, 1f);
 
-            if (useProIKFeature)
-            {
-                _animator.SetIKPositionWeight(AvatarIKGoal.RightFoot, _animator.GetFloat(rightFootAnimVarName));
-            }
-
-            MoveFeetToIKPoint(AvatarIKGoal.RightFoot, rightFootIKPos, rightFootIKRot, ref lastRightFootPosY);
+            MoveFootToIKPoint(AvatarIKGoal.RightFoot, rightFootIKPos, rightFootIKRot, ref lastRightFootPosY);
 
             _animator.SetIKPositionWeight(AvatarIKGoal.LeftFoot, 1f);
 
-            if (useProIKFeature)
-            {
-                _animator.SetIKPositionWeight(AvatarIKGoal.LeftFoot, _animator.GetFloat(leftFootAnimVarName));
-            }
-
-            MoveFeetToIKPoint(AvatarIKGoal.LeftFoot, leftFootIKPos, leftFootIKRot, ref lastLeftFootPosY);
+            MoveFootToIKPoint(AvatarIKGoal.LeftFoot, leftFootIKPos, leftFootIKRot, ref lastLeftFootPosY);
         }
 
-        private void MoveFeetToIKPoint(AvatarIKGoal foot, Vector3 posIKHolder, Quaternion rotIKHolder, ref float lastFootPosY)
+        private void MoveFootToIKPoint(AvatarIKGoal foot, Vector3 posIKHolder, Quaternion rotIKHolder, ref float lastFootPosY)
         {
             Vector3 targetIKPos = _animator.GetIKPosition(foot);
 
@@ -468,6 +457,7 @@ namespace StarterAssets
                 _animator.SetIKRotation(foot, rotIKHolder);
             }
 
+            //_animator.SetIKRotation(foot, Quaternion.identity);
             _animator.SetIKPosition(foot, targetIKPos);
         }
 
@@ -493,25 +483,29 @@ namespace StarterAssets
             lastPelvisPosY = _animator.bodyPosition.y;
         }
 
-        private void FeetPosSolver(Vector3 fromSkyPos, ref Vector3 footIKPos, ref Quaternion footIKRot)
+        private void FeetPosSolver(Vector3 fromSkyPos, ref Vector3 footIKPos, ref Quaternion footIKRot, Transform foot)
         {
-            RaycastHit feetOutHit;
+            RaycastHit footOutHit;
 
             if(showSolverDebug)
             {
                 Debug.DrawLine(fromSkyPos, fromSkyPos + Vector3.down * (raycastDownDistance + heightFromGroundRaycast), Color.yellow);
             }
 
-            if (Physics.Raycast(fromSkyPos, Vector3.down, out feetOutHit, raycastDownDistance * heightFromGroundRaycast, environmentLayer))
+            if (Physics.Raycast(fromSkyPos, Vector3.down, out footOutHit, raycastDownDistance + heightFromGroundRaycast, environmentLayer))
             {
                 footIKPos = fromSkyPos;
-                footIKPos.y = feetOutHit.point.y + pelvisOffset;
-                footIKRot = Quaternion.FromToRotation(Vector3.up, feetOutHit.normal) * transform.rotation;
+                footIKPos.y = footOutHit.point.y + pelvisOffset;
+                footIKRot = Quaternion.FromToRotation(Vector3.up, footOutHit.normal) * transform.rotation;
 
-                return;
+                //Quaternion rp = foot.parent.rotation;
+                //Vector3 footRot = new(0f, rp.eulerAngles.y, 0f);
+                //footIKRot = Quaternion.FromToRotation(Vector3.up, footOutHit.normal) * Quaternion.Euler(footRot);
             }
-
-            footIKPos = Vector3.zero;
+            else
+            {
+                footIKPos = Vector3.zero;
+            }
         }
 
         private void AdjustFeetTarget(ref Vector3 footPos, HumanBodyBones foot)
